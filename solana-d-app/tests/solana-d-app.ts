@@ -9,7 +9,45 @@ describe("solana-d-app", () => {
   const program = anchor.workspace.solanaDApp as Program<SolanaDApp>;
   const programId = new anchor.web3.PublicKey("HSh6ntCpps9Zfa9rsZjqYzEXpK3uXqEXY7iLegF9angR");
 
-  it("Registers a user and creates a PDA with an empty communities array", async () => {
+  it("Initializes the 'all' community if it doesn't exist", async () => {
+    const authority = (program.provider as anchor.AnchorProvider).wallet;
+    
+    // Find the PDA for the "all" community
+    const [communityPda] = await anchor.web3.PublicKey.findProgramAddress(
+      [Buffer.from("community"), Buffer.from("all")],
+      programId
+    );
+
+    // Try to fetch the community account first
+    let communityAccount;
+    try {
+      communityAccount = await program.account.communityAccount.fetch(communityPda);
+      console.log("Community already exists:", communityAccount);
+      console.log("'all' community PDA address:", communityPda.toBase58());
+    } catch (err) {
+      console.log("Community doesn't exist, initializing...");
+      // Initialize the "all" community
+      const tx = await program.methods
+        .initialize()
+        .accounts({
+          communityAccount: communityPda,
+          authority: authority.publicKey,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .rpc();
+      console.log("Initialize 'all' community transaction signature:", tx);
+      
+      // Fetch the newly created community account
+      communityAccount = await program.account.communityAccount.fetch(communityPda);
+    }
+
+    // Verify the community account contents
+    console.log("Fetched community account:", communityAccount);
+    assert.strictEqual(communityAccount.name, "all");
+    assert.strictEqual(communityAccount.authority.toBase58(), authority.publicKey.toBase58());
+  });
+
+  it("Registers a user and creates a PDA with the 'all' community", async () => {
     const user = anchor.web3.Keypair.generate();
     // Airdrop SOL to the user for fees
     const sig = await program.provider.connection.requestAirdrop(user.publicKey, 1e9);
@@ -21,6 +59,12 @@ describe("solana-d-app", () => {
       programId
     );
 
+    // Derive the PDA for the "all" community
+    const [communityPda] = await anchor.web3.PublicKey.findProgramAddress(
+      [Buffer.from("community"), Buffer.from("all")],
+      programId
+    );
+
     // Build the instruction
     const ix = await program.methods
       .registerUser()
@@ -28,6 +72,7 @@ describe("solana-d-app", () => {
         userAccount: userPda,
         authority: user.publicKey,
         systemProgram: anchor.web3.SystemProgram.programId,
+        allCommunity: communityPda,
       })
       .instruction();
 
@@ -48,6 +93,12 @@ describe("solana-d-app", () => {
     console.log("Fetched user account:", userAccount);
     assert.strictEqual(userAccount.authority.toBase58(), user.publicKey.toBase58());
     assert.isArray(userAccount.communities);
-    assert.lengthOf(userAccount.communities, 0);
+    assert.lengthOf(userAccount.communities, 1);
+    
+    // Check the "all" community details
+    const allCommunity = userAccount.communities[0];
+    assert.strictEqual(allCommunity.name, "all");
+    assert.strictEqual(allCommunity.pdaAddress.toBase58(), communityPda.toBase58());
+    console.log("User is registered with 'all' community:", allCommunity);
   });
 });
