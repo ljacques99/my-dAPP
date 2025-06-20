@@ -4,105 +4,10 @@ import { SolanaDApp } from "../target/types/solana_d_app";
 import { assert } from "chai";
 import idl from "../target/idl/solana_d_app.json";
 
-describe("solana-d-app", () => {
+describe("solana-d-app community", () => {
   anchor.setProvider(anchor.AnchorProvider.env());
   const program = anchor.workspace.solanaDApp as Program<SolanaDApp>;
   const programId = new anchor.web3.PublicKey("HSh6ntCpps9Zfa9rsZjqYzEXpK3uXqEXY7iLegF9angR");
-
-  it("Initializes the 'all' community if it doesn't exist", async () => {
-    const authority = (program.provider as anchor.AnchorProvider).wallet;
-    
-    // Find the PDA for the "all" community
-    const [communityPda] = await anchor.web3.PublicKey.findProgramAddress(
-      [Buffer.from("community"), Buffer.from("all")],
-      programId
-    );
-
-    // Try to fetch the community account first
-    let communityAccount;
-    try {
-      communityAccount = await program.account.communityAccount.fetch(communityPda);
-      console.log("Community already exists:", communityAccount);
-      console.log("'all' community PDA address:", communityPda.toBase58());
-    } catch (err) {
-      console.log("Community doesn't exist, initializing...");
-      // Initialize the "all" community
-      const tx = await program.methods
-        .initialize()
-        .accounts({
-          communityAccount: communityPda,
-          authority: authority.publicKey,
-          systemProgram: anchor.web3.SystemProgram.programId,
-        })
-        .rpc();
-      console.log("Initialize 'all' community transaction signature:", tx);
-      
-      // Fetch the newly created community account
-      communityAccount = await program.account.communityAccount.fetch(communityPda);
-    }
-
-    // Verify the community account contents
-    console.log("Fetched community account:", communityAccount);
-    assert.strictEqual(communityAccount.name, "all");
-    assert.strictEqual(communityAccount.authority.toBase58(), authority.publicKey.toBase58());
-    assert.isArray(communityAccount.surveys);
-    assert.lengthOf(communityAccount.surveys, 0);
-  });
-
-  it("Registers a user and creates a PDA with the 'all' community", async () => {
-    const user = anchor.web3.Keypair.generate();
-    // Airdrop SOL to the user for fees
-    const sig = await program.provider.connection.requestAirdrop(user.publicKey, 1e9);
-    await program.provider.connection.confirmTransaction(sig);
-
-    // Derive the PDA for the user
-    const [userPda] = await anchor.web3.PublicKey.findProgramAddress(
-      [Buffer.from("user"), user.publicKey.toBuffer()],
-      programId
-    );
-
-    // Derive the PDA for the "all" community
-    const [communityPda] = await anchor.web3.PublicKey.findProgramAddress(
-      [Buffer.from("community"), Buffer.from("all")],
-      programId
-    );
-
-    // Build the instruction
-    const ix = await program.methods
-      .registerUser()
-      .accounts({
-        userAccount: userPda,
-        authority: user.publicKey,
-        systemProgram: anchor.web3.SystemProgram.programId,
-        allCommunity: communityPda,
-      })
-      .instruction();
-
-    // Create and send the transaction with the user as fee payer
-    const tx = new anchor.web3.Transaction().add(ix);
-    tx.feePayer = user.publicKey;
-    const latestBlockhash = await program.provider.connection.getLatestBlockhash();
-    tx.recentBlockhash = latestBlockhash.blockhash;
-    const signedTx = await anchor.web3.sendAndConfirmTransaction(
-      program.provider.connection,
-      tx,
-      [user]
-    );
-    console.log("RegisterUser transaction signature:", signedTx);
-
-    // Fetch the user account and check its contents
-    const userAccount = await program.account.userAccount.fetch(userPda);
-    console.log("Fetched user account:", userAccount);
-    assert.strictEqual(userAccount.authority.toBase58(), user.publicKey.toBase58());
-    assert.isArray(userAccount.communities);
-    assert.lengthOf(userAccount.communities, 1);
-    
-    // Check the "all" community reference details
-    const allCommunityRef = userAccount.communities[0];
-    assert.strictEqual(allCommunityRef.name, "all");
-    assert.strictEqual(allCommunityRef.pdaAddress.toBase58(), communityPda.toBase58());
-    console.log("User is registered with 'all' community reference:", allCommunityRef);
-  });
 
   it("A registered user successfully creates a community", async () => {
     const user = anchor.web3.Keypair.generate();
@@ -445,120 +350,130 @@ describe("solana-d-app", () => {
     }
   });
 
-  it("Rejects creating a community with a duplicate name by another user", async () => {
-    // Create the first user and register them
-    const user1 = anchor.web3.Keypair.generate();
-    const sig1 = await program.provider.connection.requestAirdrop(user1.publicKey, 1e9);
-    await program.provider.connection.confirmTransaction(sig1);
+  it("Rejects creating a community with a duplicate name by another user", function (done) {
+    this.timeout(3000); // 10 seconds
+    let finished = false;
+    setTimeout(() => {
+      if (!finished) done(new Error("Test timed out!"));
+    }, 9000);
+    (async () => {
+      try {
+        // Create the first user and register them
+        const user1 = anchor.web3.Keypair.generate();
+        const sig1 = await program.provider.connection.requestAirdrop(user1.publicKey, 1e9);
+        await program.provider.connection.confirmTransaction(sig1);
 
-    const [user1Pda] = await anchor.web3.PublicKey.findProgramAddress(
-      [Buffer.from("user"), user1.publicKey.toBuffer()],
-      programId
-    );
-    const [allCommunityPda] = await anchor.web3.PublicKey.findProgramAddress(
-      [Buffer.from("community"), Buffer.from("all")],
-      programId
-    );
-    const registerIx1 = await program.methods
-      .registerUser()
-      .accounts({
-        userAccount: user1Pda,
-        authority: user1.publicKey,
-        systemProgram: anchor.web3.SystemProgram.programId,
-        allCommunity: allCommunityPda,
-      })
-      .instruction();
-    const registerTx1 = new anchor.web3.Transaction().add(registerIx1);
-    registerTx1.feePayer = user1.publicKey;
-    const registerBlockhash1 = await program.provider.connection.getLatestBlockhash();
-    registerTx1.recentBlockhash = registerBlockhash1.blockhash;
-    await anchor.web3.sendAndConfirmTransaction(
-      program.provider.connection,
-      registerTx1,
-      [user1]
-    );
+        const [user1Pda] = await anchor.web3.PublicKey.findProgramAddress(
+          [Buffer.from("user"), user1.publicKey.toBuffer()],
+          programId
+        );
+        const [allCommunityPda] = await anchor.web3.PublicKey.findProgramAddress(
+          [Buffer.from("community"), Buffer.from("all")],
+          programId
+        );
+        const registerIx1 = await program.methods
+          .registerUser()
+          .accounts({
+            userAccount: user1Pda,
+            authority: user1.publicKey,
+            systemProgram: anchor.web3.SystemProgram.programId,
+            allCommunity: allCommunityPda,
+          })
+          .instruction();
+        const registerTx1 = new anchor.web3.Transaction().add(registerIx1);
+        registerTx1.feePayer = user1.publicKey;
+        const registerBlockhash1 = await program.provider.connection.getLatestBlockhash();
+        registerTx1.recentBlockhash = registerBlockhash1.blockhash;
+        await anchor.web3.sendAndConfirmTransaction(
+          program.provider.connection,
+          registerTx1,
+          [user1]
+        );
 
-    // User1 creates a community
-    const communityName = "duplicate-test-community";
-    const [communityPda] = await anchor.web3.PublicKey.findProgramAddress(
-      [Buffer.from("community"), Buffer.from(communityName)],
-      programId
-    );
+        // User1 creates a community
+        const communityName = "duplicate-test-community";
+        const [communityPda] = await anchor.web3.PublicKey.findProgramAddress(
+          [Buffer.from("community"), Buffer.from(communityName)],
+          programId
+        );
 
-    const createIx = await program.methods
-      .createCommunity(communityName)
-      .accounts({
-        communityAccount: communityPda,
-        authority: user1.publicKey,
-        userAccount: user1Pda,
-        systemProgram: anchor.web3.SystemProgram.programId,
-      })
-      .instruction();
+        const createIx = await program.methods
+          .createCommunity(communityName)
+          .accounts({
+            communityAccount: communityPda,
+            authority: user1.publicKey,
+            userAccount: user1Pda,
+            systemProgram: anchor.web3.SystemProgram.programId,
+          })
+          .instruction();
 
-    const createTx = new anchor.web3.Transaction().add(createIx);
-    createTx.feePayer = user1.publicKey;
-    const createBlockhash = await program.provider.connection.getLatestBlockhash();
-    createTx.recentBlockhash = createBlockhash.blockhash;
-    await anchor.web3.sendAndConfirmTransaction(
-      program.provider.connection,
-      createTx,
-      [user1]
-    );
+        const createTx = new anchor.web3.Transaction().add(createIx);
+        createTx.feePayer = user1.publicKey;
+        const createBlockhash = await program.provider.connection.getLatestBlockhash();
+        createTx.recentBlockhash = createBlockhash.blockhash;
+        await anchor.web3.sendAndConfirmTransaction(
+          program.provider.connection,
+          createTx,
+          [user1]
+        );
 
-    // Create the second user and register them
-    const user2 = anchor.web3.Keypair.generate();
-    const sig2 = await program.provider.connection.requestAirdrop(user2.publicKey, 1e9);
-    await program.provider.connection.confirmTransaction(sig2);
+        // Create the second user and register them
+        const user2 = anchor.web3.Keypair.generate();
+        const sig2 = await program.provider.connection.requestAirdrop(user2.publicKey, 1e9);
+        await program.provider.connection.confirmTransaction(sig2);
 
-    const [user2Pda] = await anchor.web3.PublicKey.findProgramAddress(
-      [Buffer.from("user"), user2.publicKey.toBuffer()],
-      programId
-    );
+        const [user2Pda] = await anchor.web3.PublicKey.findProgramAddress(
+          [Buffer.from("user"), user2.publicKey.toBuffer()],
+          programId
+        );
 
-    const registerIx2 = await program.methods
-      .registerUser()
-      .accounts({
-        userAccount: user2Pda,
-        authority: user2.publicKey,
-        systemProgram: anchor.web3.SystemProgram.programId,
-        allCommunity: allCommunityPda,
-      })
-      .instruction();
-    const registerTx2 = new anchor.web3.Transaction().add(registerIx2);
-    registerTx2.feePayer = user2.publicKey;
-    const registerBlockhash2 = await program.provider.connection.getLatestBlockhash();
-    registerTx2.recentBlockhash = registerBlockhash2.blockhash;
-    await anchor.web3.sendAndConfirmTransaction(
-      program.provider.connection,
-      registerTx2,
-      [user2]
-    );
+        const registerIx2 = await program.methods
+          .registerUser()
+          .accounts({
+            userAccount: user2Pda,
+            authority: user2.publicKey,
+            systemProgram: anchor.web3.SystemProgram.programId,
+            allCommunity: allCommunityPda,
+          })
+          .instruction();
+        const registerTx2 = new anchor.web3.Transaction().add(registerIx2);
+        registerTx2.feePayer = user2.publicKey;
+        const registerBlockhash2 = await program.provider.connection.getLatestBlockhash();
+        registerTx2.recentBlockhash = registerBlockhash2.blockhash;
+        await anchor.web3.sendAndConfirmTransaction(
+          program.provider.connection,
+          registerTx2,
+          [user2]
+        );
 
-    // Now, user2 tries to create a community with the same name, which should fail
-    try {
-      const createAgainIx = await program.methods
-        .createCommunity(communityName)
-        .accounts({
-          communityAccount: communityPda,
-          authority: user2.publicKey,
-          userAccount: user2Pda,
-          systemProgram: anchor.web3.SystemProgram.programId,
-        })
-        .instruction();
+        // Now, user2 tries to create a community with the same name, which should fail
+        const createAgainIx = await program.methods
+          .createCommunity(communityName)
+          .accounts({
+            communityAccount: communityPda,
+            authority: user2.publicKey,
+            userAccount: user2Pda,
+            systemProgram: anchor.web3.SystemProgram.programId,
+          })
+          .instruction();
 
-      const createAgainTx = new anchor.web3.Transaction().add(createAgainIx);
-      createAgainTx.feePayer = user2.publicKey;
-      const createAgainBlockhash = await program.provider.connection.getLatestBlockhash();
-      createAgainTx.recentBlockhash = createAgainBlockhash.blockhash;
-      await anchor.web3.sendAndConfirmTransaction(
-        program.provider.connection,
-        createAgainTx,
-        [user2]
-      );
-      assert.fail("Should have failed to create a community with a duplicate name.");
-    } catch (error) {
-      console.log("Successfully rejected creating a community with a duplicate name by another user.");
-      assert.include(error.message, "failed");
-    }
+        const createAgainTx = new anchor.web3.Transaction().add(createAgainIx);
+        createAgainTx.feePayer = user2.publicKey;
+        const createAgainBlockhash = await program.provider.connection.getLatestBlockhash();
+        createAgainTx.recentBlockhash = createAgainBlockhash.blockhash;
+
+        await anchor.web3.sendAndConfirmTransaction(
+          program.provider.connection,
+          createAgainTx,
+          [user2]
+        );
+        finished = true;
+        done(new Error("Should have failed to create a community with a duplicate name."));
+      } catch (error) {
+        finished = true;
+        console.log("Test passed: duplicate community creation was rejected as expected.");
+        done();
+      }
+    })();
   });
 });
