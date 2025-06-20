@@ -444,4 +444,121 @@ describe("solana-d-app", () => {
       assert.include(error.message, "failed");
     }
   });
+
+  it("Rejects creating a community with a duplicate name by another user", async () => {
+    // Create the first user and register them
+    const user1 = anchor.web3.Keypair.generate();
+    const sig1 = await program.provider.connection.requestAirdrop(user1.publicKey, 1e9);
+    await program.provider.connection.confirmTransaction(sig1);
+
+    const [user1Pda] = await anchor.web3.PublicKey.findProgramAddress(
+      [Buffer.from("user"), user1.publicKey.toBuffer()],
+      programId
+    );
+    const [allCommunityPda] = await anchor.web3.PublicKey.findProgramAddress(
+      [Buffer.from("community"), Buffer.from("all")],
+      programId
+    );
+    const registerIx1 = await program.methods
+      .registerUser()
+      .accounts({
+        userAccount: user1Pda,
+        authority: user1.publicKey,
+        systemProgram: anchor.web3.SystemProgram.programId,
+        allCommunity: allCommunityPda,
+      })
+      .instruction();
+    const registerTx1 = new anchor.web3.Transaction().add(registerIx1);
+    registerTx1.feePayer = user1.publicKey;
+    const registerBlockhash1 = await program.provider.connection.getLatestBlockhash();
+    registerTx1.recentBlockhash = registerBlockhash1.blockhash;
+    await anchor.web3.sendAndConfirmTransaction(
+      program.provider.connection,
+      registerTx1,
+      [user1]
+    );
+
+    // User1 creates a community
+    const communityName = "duplicate-test-community";
+    const [communityPda] = await anchor.web3.PublicKey.findProgramAddress(
+      [Buffer.from("community"), Buffer.from(communityName)],
+      programId
+    );
+
+    const createIx = await program.methods
+      .createCommunity(communityName)
+      .accounts({
+        communityAccount: communityPda,
+        authority: user1.publicKey,
+        userAccount: user1Pda,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .instruction();
+
+    const createTx = new anchor.web3.Transaction().add(createIx);
+    createTx.feePayer = user1.publicKey;
+    const createBlockhash = await program.provider.connection.getLatestBlockhash();
+    createTx.recentBlockhash = createBlockhash.blockhash;
+    await anchor.web3.sendAndConfirmTransaction(
+      program.provider.connection,
+      createTx,
+      [user1]
+    );
+
+    // Create the second user and register them
+    const user2 = anchor.web3.Keypair.generate();
+    const sig2 = await program.provider.connection.requestAirdrop(user2.publicKey, 1e9);
+    await program.provider.connection.confirmTransaction(sig2);
+
+    const [user2Pda] = await anchor.web3.PublicKey.findProgramAddress(
+      [Buffer.from("user"), user2.publicKey.toBuffer()],
+      programId
+    );
+
+    const registerIx2 = await program.methods
+      .registerUser()
+      .accounts({
+        userAccount: user2Pda,
+        authority: user2.publicKey,
+        systemProgram: anchor.web3.SystemProgram.programId,
+        allCommunity: allCommunityPda,
+      })
+      .instruction();
+    const registerTx2 = new anchor.web3.Transaction().add(registerIx2);
+    registerTx2.feePayer = user2.publicKey;
+    const registerBlockhash2 = await program.provider.connection.getLatestBlockhash();
+    registerTx2.recentBlockhash = registerBlockhash2.blockhash;
+    await anchor.web3.sendAndConfirmTransaction(
+      program.provider.connection,
+      registerTx2,
+      [user2]
+    );
+
+    // Now, user2 tries to create a community with the same name, which should fail
+    try {
+      const createAgainIx = await program.methods
+        .createCommunity(communityName)
+        .accounts({
+          communityAccount: communityPda,
+          authority: user2.publicKey,
+          userAccount: user2Pda,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .instruction();
+
+      const createAgainTx = new anchor.web3.Transaction().add(createAgainIx);
+      createAgainTx.feePayer = user2.publicKey;
+      const createAgainBlockhash = await program.provider.connection.getLatestBlockhash();
+      createAgainTx.recentBlockhash = createAgainBlockhash.blockhash;
+      await anchor.web3.sendAndConfirmTransaction(
+        program.provider.connection,
+        createAgainTx,
+        [user2]
+      );
+      assert.fail("Should have failed to create a community with a duplicate name.");
+    } catch (error) {
+      console.log("Successfully rejected creating a community with a duplicate name by another user.");
+      assert.include(error.message, "failed");
+    }
+  });
 });
