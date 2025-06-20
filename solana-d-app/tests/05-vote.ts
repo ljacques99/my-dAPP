@@ -268,4 +268,99 @@ describe("vote instruction", () => {
       assert.include(e.message, "not a member");
     }
   });
+
+  it("blocks a user from voting twice on the same survey", async () => {
+    // Setup user and community
+    const user = anchor.web3.Keypair.generate();
+    const sig = await program.provider.connection.requestAirdrop(user.publicKey, 1e9);
+    await program.provider.connection.confirmTransaction(sig);
+    const [userPda] = await anchor.web3.PublicKey.findProgramAddress(
+      [Buffer.from("user"), user.publicKey.toBuffer()],
+      programId
+    );
+    const [allCommunityPda] = await anchor.web3.PublicKey.findProgramAddress(
+      [Buffer.from("community"), Buffer.from("all")],
+      programId
+    );
+    const uniqueCommunityName = "votecommunity" + user.publicKey.toBase58().slice(0, 4);
+    // Register user
+    const regIx = await program.methods
+      .registerUser()
+      .accounts({
+        userAccount: userPda,
+        authority: user.publicKey,
+        systemProgram: anchor.web3.SystemProgram.programId,
+        allCommunity: allCommunityPda,
+      })
+      .instruction();
+    await sendIx(regIx, user.publicKey, [user]);
+    // Create community
+    const [communityPda] = await anchor.web3.PublicKey.findProgramAddress(
+      [Buffer.from("community"), Buffer.from(uniqueCommunityName)],
+      programId
+    );
+    const comIx = await program.methods
+      .createCommunity(uniqueCommunityName)
+      .accounts({
+        communityAccount: communityPda,
+        authority: user.publicKey,
+        userAccount: userPda,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .instruction();
+    await sendIx(comIx, user.publicKey, [user]);
+    // Create survey
+    const [surveyPda] = await anchor.web3.PublicKey.findProgramAddress(
+      [Buffer.from("survey"), Buffer.from(uniqueCommunityName), Buffer.from(surveyTitle)],
+      programId
+    );
+    const now = Math.floor(Date.now() / 1000);
+    const limitdate = now + 3600;
+    const surveyIx = await program.methods
+      .createSurvey(surveyTitle, surveyQuestions, surveyAnswers, new anchor.BN(limitdate))
+      .accounts({
+        communityAccount: communityPda,
+        surveyAccount: surveyPda,
+        authority: user.publicKey,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .instruction();
+    await sendIx(surveyIx, user.publicKey, [user]);
+    // First vote
+    const [voteRecordPda] = await anchor.web3.PublicKey.findProgramAddress(
+      [Buffer.from("vote"), surveyPda.toBuffer(), user.publicKey.toBuffer()],
+      programId
+    );
+    const voteIx = await program.methods
+      .vote(1)
+      .accounts({
+        userAccount: userPda,
+        surveyAccount: surveyPda,
+        communityAccount: communityPda,
+        authority: user.publicKey,
+        voteRecord: voteRecordPda,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .instruction();
+    await sendIx(voteIx, user.publicKey, [user]);
+    // Second vote (should fail)
+    try {
+      const voteIx2 = await program.methods
+        .vote(2)
+        .accounts({
+          userAccount: userPda,
+          surveyAccount: surveyPda,
+          communityAccount: communityPda,
+          authority: user.publicKey,
+          voteRecord: voteRecordPda,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .instruction();
+      await sendIx(voteIx2, user.publicKey, [user]);
+      assert.fail("Second vote should have failed");
+    } catch (e) {
+      console.log('Expected error message:', e.message);
+      assert.include(e.message, "already in use"); // Anchor error for PDA already exists
+    }
+  });
 }); 

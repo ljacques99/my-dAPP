@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::account_info::AccountInfo;
 
 // Maximum number of communities per user
 const MAX_COMMUNITIES_PER_USER: usize = 10;
@@ -126,6 +127,8 @@ pub mod solana_d_app {
         let user_account = &ctx.accounts.user_account;
         let survey_account = &mut ctx.accounts.survey_account;
         let community_account = &ctx.accounts.community_account;
+        let authority_key = ctx.accounts.authority.key();
+        let vote_record = &mut ctx.accounts.vote_record;
 
         // Check user is a member of the community
         let is_member = user_account.communities.iter().any(|c| c.pda_address == community_account.key());
@@ -141,8 +144,9 @@ pub mod solana_d_app {
         // Check answer_index is valid
         require!((answer_index as usize) < survey_account.answers.len(), ErrorCode::InvalidAnswerIndex);
 
-        // Increment vote
+        // No explicit check for already voted; rely on Anchor's PDA init error
         survey_account.answers[answer_index as usize].votes += 1;
+        vote_record.voter = authority_key;
         Ok(())
     }
 }
@@ -261,6 +265,11 @@ pub struct Answer {
     pub votes: u32,
 }
 
+#[account]
+pub struct VoteRecord {
+    pub voter: Pubkey,
+}
+
 #[error_code]
 pub enum ErrorCode {
     #[msg("User is already a member of this community.")]
@@ -310,5 +319,15 @@ pub struct Vote<'info> {
     #[account(mut)]
     pub survey_account: Account<'info, SurveyAccount>,
     pub community_account: Account<'info, CommunityAccount>,
+    #[account(mut)]
     pub authority: Signer<'info>,
+    #[account(
+        init,
+        payer = authority,
+        space = 8 + 32, // discriminator + voter pubkey
+        seeds = [b"vote", survey_account.key().as_ref(), authority.key().as_ref()],
+        bump
+    )]
+    pub vote_record: Account<'info, VoteRecord>,
+    pub system_program: Program<'info, System>,
 }
