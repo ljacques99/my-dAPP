@@ -17,6 +17,7 @@ describe("survey creation", () => {
   let userPda: anchor.web3.PublicKey;
   let communityPda: anchor.web3.PublicKey;
   let surveyPda: anchor.web3.PublicKey;
+  let uniqueCommunityName: string;
 
   it("registers a user", async () => {
     user = anchor.web3.Keypair.generate();
@@ -31,6 +32,8 @@ describe("survey creation", () => {
       [Buffer.from("community"), Buffer.from("all")],
       programId
     );
+    // Use first 4 digits of user address for unique community name
+    uniqueCommunityName = communityName + user.publicKey.toBase58().slice(0, 4);
     const ix = await program.methods
       .registerUser()
       .accounts({
@@ -53,11 +56,11 @@ describe("survey creation", () => {
 
   it("creates a community", async () => {
     [communityPda] = await anchor.web3.PublicKey.findProgramAddress(
-      [Buffer.from("community"), Buffer.from(communityName)],
+      [Buffer.from("community"), Buffer.from(uniqueCommunityName)],
       programId
     );
     const ix = await program.methods
-      .createCommunity(communityName)
+      .createCommunity(uniqueCommunityName)
       .accounts({
         communityAccount: communityPda,
         authority: user.publicKey,
@@ -78,11 +81,14 @@ describe("survey creation", () => {
 
   it("creates a survey", async () => {
     [surveyPda] = await anchor.web3.PublicKey.findProgramAddress(
-      [Buffer.from("survey"), Buffer.from(communityName), Buffer.from(surveyTitle)],
+      [Buffer.from("survey"), Buffer.from(uniqueCommunityName), Buffer.from(surveyTitle)],
       programId
     );
+    // Set limitdate to 1 hour in the future
+    const now = Math.floor(Date.now() / 1000);
+    const limitdate = now + 3600;
     const ix = await program.methods
-      .createSurvey(surveyTitle, surveyQuestions, surveyAnswers)
+      .createSurvey(surveyTitle, surveyQuestions, surveyAnswers, new anchor.BN(limitdate))
       .accounts({
         communityAccount: communityPda,
         surveyAccount: surveyPda,
@@ -103,11 +109,12 @@ describe("survey creation", () => {
     // Fetch and check the survey account
     const survey = await program.account.surveyAccount.fetch(surveyPda);
     assert.equal(survey.title, surveyTitle);
-    assert.equal(survey.communityName, communityName);
+    assert.equal(survey.communityName, uniqueCommunityName);
     assert.equal(survey.questions, surveyQuestions);
     assert.lengthOf(survey.answers, 4);
     assert.equal(survey.answers[0].text, "Red");
     assert.equal(survey.answers[0].votes, 0);
+    assert.equal(survey.limitdate.toNumber(), limitdate);
 
     // Fetch and check the community account's surveys vector
     const community = await program.account.communityAccount.fetch(communityPda);

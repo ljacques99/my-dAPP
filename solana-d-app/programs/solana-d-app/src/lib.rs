@@ -93,8 +93,11 @@ pub mod solana_d_app {
         title: String,
         questions: String,
         answers: Vec<String>, // Should be max 4
+        limitdate: i64,
     ) -> Result<()> {
         require!(answers.len() <= 4, ErrorCode::TooManyAnswers);
+        let now = Clock::get()?.unix_timestamp;
+        require!(limitdate > now, ErrorCode::LimitDateInPast);
         let survey_account = &mut ctx.accounts.survey_account;
         survey_account.title = title.clone();
         survey_account.community_name = ctx.accounts.community_account.name.clone();
@@ -103,6 +106,7 @@ pub mod solana_d_app {
             .into_iter()
             .map(|text| Answer { text, votes: 0 })
             .collect();
+        survey_account.limitdate = limitdate;
 
         // Add survey reference to community
         let community_account = &mut ctx.accounts.community_account;
@@ -221,6 +225,7 @@ pub struct SurveyAccount {
     pub community_name: String,
     pub questions: String,
     pub answers: Vec<Answer>, // max 4
+    pub limitdate: i64, // Unix timestamp
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
@@ -237,10 +242,12 @@ pub enum ErrorCode {
     TooManyCommunities,
     #[msg("Too many answers provided (max 4).")]
     TooManyAnswers,
+    #[msg("Limit date must be in the future.")]
+    LimitDateInPast,
 }
 
 #[derive(Accounts)]
-#[instruction(title: String, questions: String, answers: Vec<String>)]
+#[instruction(title: String, questions: String, answers: Vec<String>, limitdate: i64)]
 pub struct CreateSurvey<'info> {
     #[account(
         mut,
@@ -251,7 +258,7 @@ pub struct CreateSurvey<'info> {
     #[account(
         init,
         payer = authority,
-        space = 8 + (4 + 50) + (4 + 50) + (4 + 200) + 4 + (4 * (4 + 50 + 4)), // discriminator + title + community_name + questions + answers vec (max 4 answers)
+        space = 8 + (4 + 50) + (4 + 50) + (4 + 200) + 4 + (4 * (4 + 50 + 4)) + 8, // discriminator + title + community_name + questions + answers vec (max 4 answers) + limitdate
         seeds = [b"survey", community_account.name.as_bytes(), title.as_bytes()],
         bump
     )]
