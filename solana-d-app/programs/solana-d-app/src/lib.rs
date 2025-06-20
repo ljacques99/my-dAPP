@@ -118,6 +118,33 @@ pub mod solana_d_app {
         msg!("Survey '{}' created for community '{}' at PDA: {}", title, community_account.name, survey_account.key());
         Ok(())
     }
+
+    pub fn vote(
+        ctx: Context<Vote>,
+        answer_index: u8,
+    ) -> Result<()> {
+        let user_account = &ctx.accounts.user_account;
+        let survey_account = &mut ctx.accounts.survey_account;
+        let community_account = &ctx.accounts.community_account;
+
+        // Check user is a member of the community
+        let is_member = user_account.communities.iter().any(|c| c.pda_address == community_account.key());
+        require!(is_member, ErrorCode::NotMemberOfCommunity);
+
+        // Check survey is linked to the community
+        require!(survey_account.community_name == community_account.name, ErrorCode::SurveyNotInCommunity);
+
+        // Check time is before limitdate
+        let now = Clock::get()?.unix_timestamp;
+        require!(now < survey_account.limitdate, ErrorCode::VotingClosed);
+
+        // Check answer_index is valid
+        require!((answer_index as usize) < survey_account.answers.len(), ErrorCode::InvalidAnswerIndex);
+
+        // Increment vote
+        survey_account.answers[answer_index as usize].votes += 1;
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -244,6 +271,14 @@ pub enum ErrorCode {
     TooManyAnswers,
     #[msg("Limit date must be in the future.")]
     LimitDateInPast,
+    #[msg("User is not a member of the community.")]
+    NotMemberOfCommunity,
+    #[msg("Survey is not linked to the community.")]
+    SurveyNotInCommunity,
+    #[msg("Voting is closed for this survey.")]
+    VotingClosed,
+    #[msg("Invalid answer index.")]
+    InvalidAnswerIndex,
 }
 
 #[derive(Accounts)]
@@ -266,4 +301,14 @@ pub struct CreateSurvey<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct Vote<'info> {
+    #[account(mut)]
+    pub user_account: Account<'info, UserAccount>,
+    #[account(mut)]
+    pub survey_account: Account<'info, SurveyAccount>,
+    pub community_account: Account<'info, CommunityAccount>,
+    pub authority: Signer<'info>,
 }

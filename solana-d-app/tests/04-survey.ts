@@ -19,6 +19,19 @@ describe("survey creation", () => {
   let surveyPda: anchor.web3.PublicKey;
   let uniqueCommunityName: string;
 
+  async function sendIx(ix: anchor.web3.TransactionInstruction, feePayer: anchor.web3.PublicKey, signers: anchor.web3.Keypair[]) {
+    const tx = new anchor.web3.Transaction().add(ix);
+    tx.feePayer = feePayer;
+    const latestBlockhash = await program.provider.connection.getLatestBlockhash();
+    tx.recentBlockhash = latestBlockhash.blockhash;
+    const sig = await anchor.web3.sendAndConfirmTransaction(
+      program.provider.connection,
+      tx,
+      signers
+    );
+    console.log('Transaction signature:', sig);
+  }
+
   it("registers a user", async () => {
     user = anchor.web3.Keypair.generate();
     // Airdrop SOL to the user for fees
@@ -43,15 +56,7 @@ describe("survey creation", () => {
         allCommunity: allCommunityPda,
       })
       .instruction();
-    const tx = new anchor.web3.Transaction().add(ix);
-    tx.feePayer = user.publicKey;
-    const latestBlockhash = await program.provider.connection.getLatestBlockhash();
-    tx.recentBlockhash = latestBlockhash.blockhash;
-    await anchor.web3.sendAndConfirmTransaction(
-      program.provider.connection,
-      tx,
-      [user]
-    );
+    await sendIx(ix, user.publicKey, [user]);
   });
 
   it("creates a community", async () => {
@@ -68,15 +73,7 @@ describe("survey creation", () => {
         systemProgram: anchor.web3.SystemProgram.programId,
       })
       .instruction();
-    const tx = new anchor.web3.Transaction().add(ix);
-    tx.feePayer = user.publicKey;
-    const latestBlockhash = await program.provider.connection.getLatestBlockhash();
-    tx.recentBlockhash = latestBlockhash.blockhash;
-    await anchor.web3.sendAndConfirmTransaction(
-      program.provider.connection,
-      tx,
-      [user]
-    );
+    await sendIx(ix, user.publicKey, [user]);
   });
 
   it("creates a survey", async () => {
@@ -96,15 +93,7 @@ describe("survey creation", () => {
         systemProgram: anchor.web3.SystemProgram.programId,
       })
       .instruction();
-    const tx = new anchor.web3.Transaction().add(ix);
-    tx.feePayer = user.publicKey;
-    const latestBlockhash = await program.provider.connection.getLatestBlockhash();
-    tx.recentBlockhash = latestBlockhash.blockhash;
-    await anchor.web3.sendAndConfirmTransaction(
-      program.provider.connection,
-      tx,
-      [user]
-    );
+    await sendIx(ix, user.publicKey, [user]);
 
     // Fetch and check the survey account
     const survey = await program.account.surveyAccount.fetch(surveyPda);
