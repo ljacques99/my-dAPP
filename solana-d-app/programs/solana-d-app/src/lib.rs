@@ -96,6 +96,12 @@ pub mod solana_d_app {
         answers: Vec<String>, // Should be max 4
         limitdate: i64,
     ) -> Result<()> {
+        // Check that the user is a member of the community
+        let user_account = &ctx.accounts.user_account;
+        let community_account = &ctx.accounts.community_account;
+        let is_member = user_account.communities.iter().any(|c| c.pda_address == community_account.key());
+        require!(is_member, ErrorCode::NotMemberOfCommunity);
+
         require!(answers.len() <= 4, ErrorCode::TooManyAnswers);
         let now = Clock::get()?.unix_timestamp;
         require!(limitdate > now, ErrorCode::LimitDateInPast);
@@ -309,6 +315,13 @@ pub struct CreateSurvey<'info> {
     pub survey_account: Account<'info, SurveyAccount>,
     #[account(mut)]
     pub authority: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [b"user", authority.key().as_ref()],
+        bump,
+        constraint = user_account.authority == authority.key()
+    )]
+    pub user_account: Account<'info, UserAccount>,
     pub system_program: Program<'info, System>,
 }
 
