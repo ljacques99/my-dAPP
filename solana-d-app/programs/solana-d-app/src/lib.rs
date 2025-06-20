@@ -87,6 +87,33 @@ pub mod solana_d_app {
         msg!("User {} joined community '{}'", ctx.accounts.authority.key(), community_account.name);
         Ok(())
     }
+
+    pub fn create_survey(
+        ctx: Context<CreateSurvey>,
+        title: String,
+        questions: String,
+        answers: Vec<String>, // Should be max 4
+    ) -> Result<()> {
+        require!(answers.len() <= 4, ErrorCode::TooManyAnswers);
+        let survey_account = &mut ctx.accounts.survey_account;
+        survey_account.title = title.clone();
+        survey_account.community_name = ctx.accounts.community_account.name.clone();
+        survey_account.questions = questions;
+        survey_account.answers = answers
+            .into_iter()
+            .map(|text| Answer { text, votes: 0 })
+            .collect();
+
+        // Add survey reference to community
+        let community_account = &mut ctx.accounts.community_account;
+        let survey_ref = SurveyRef {
+            title: title.clone(),
+            pda_address: survey_account.key(),
+        };
+        community_account.surveys.push(survey_ref);
+        msg!("Survey '{}' created for community '{}' at PDA: {}", title, community_account.name, survey_account.key());
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -179,7 +206,27 @@ pub struct CommunityRef {
 pub struct CommunityAccount {
     pub name: String,
     pub authority: Pubkey,
-    pub surveys: Vec<String>,
+    pub surveys: Vec<SurveyRef>,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
+pub struct SurveyRef {
+    pub title: String,
+    pub pda_address: Pubkey,
+}
+
+#[account]
+pub struct SurveyAccount {
+    pub title: String,
+    pub community_name: String,
+    pub questions: String,
+    pub answers: Vec<Answer>, // max 4
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
+pub struct Answer {
+    pub text: String,
+    pub votes: u32,
 }
 
 #[error_code]
@@ -188,4 +235,28 @@ pub enum ErrorCode {
     AlreadyMember,
     #[msg("User has reached the maximum number of communities.")]
     TooManyCommunities,
+    #[msg("Too many answers provided (max 4).")]
+    TooManyAnswers,
+}
+
+#[derive(Accounts)]
+#[instruction(title: String, questions: String, answers: Vec<String>)]
+pub struct CreateSurvey<'info> {
+    #[account(
+        mut,
+        seeds = [b"community", community_account.name.as_bytes()],
+        bump
+    )]
+    pub community_account: Account<'info, CommunityAccount>,
+    #[account(
+        init,
+        payer = authority,
+        space = 8 + (4 + 50) + (4 + 50) + (4 + 200) + 4 + (4 * (4 + 50 + 4)), // discriminator + title + community_name + questions + answers vec (max 4 answers)
+        seeds = [b"survey", community_account.name.as_bytes(), title.as_bytes()],
+        bump
+    )]
+    pub survey_account: Account<'info, SurveyAccount>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
 }
