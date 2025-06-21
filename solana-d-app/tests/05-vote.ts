@@ -78,6 +78,7 @@ describe("vote instruction", () => {
         communityAccount: communityPda,
         surveyAccount: surveyPda,
         authority: user.publicKey,
+        userAccount: userPda,
         systemProgram: anchor.web3.SystemProgram.programId,
       })
       .instruction();
@@ -151,6 +152,7 @@ describe("vote instruction", () => {
         communityAccount: communityPda,
         surveyAccount: surveyPda,
         authority: user.publicKey,
+        userAccount: userPda,
         systemProgram: anchor.web3.SystemProgram.programId,
       })
       .instruction();
@@ -246,6 +248,7 @@ describe("vote instruction", () => {
         communityAccount: communityPda,
         surveyAccount: surveyPda,
         authority: user1.publicKey,
+        userAccount: user1Pda,
         systemProgram: anchor.web3.SystemProgram.programId,
       })
       .instruction();
@@ -322,6 +325,7 @@ describe("vote instruction", () => {
         communityAccount: communityPda,
         surveyAccount: surveyPda,
         authority: user.publicKey,
+        userAccount: userPda,
         systemProgram: anchor.web3.SystemProgram.programId,
       })
       .instruction();

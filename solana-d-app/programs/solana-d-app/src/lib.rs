@@ -1,10 +1,17 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::account_info::AccountInfo;
+use anchor_lang::solana_program::system_program;
 
 // Maximum number of communities per user
 const MAX_COMMUNITIES_PER_USER: usize = 10;
 // Maximum number of surveys per community
 const MAX_SURVEYS_PER_COMMUNITY: usize = 5;
+// Maximum length of survey title
+const MAX_SURVEY_TITLE_LENGTH: usize = 30; // tests based on 30
+// Maximum length of survey question
+const MAX_SURVEY_QUESTION_LENGTH: usize = 200;
+// Maximum length of survey answer
+const MAX_SURVEY_ANSWER_LENGTH: usize = 50;
 
 declare_id!("HSh6ntCpps9Zfa9rsZjqYzEXpK3uXqEXY7iLegF9angR");
 
@@ -19,6 +26,16 @@ pub mod solana_d_app {
         community_account.authority = ctx.accounts.authority.key();
         community_account.surveys = Vec::new();
         msg!("'all' community created at PDA: {}", community_account.key());
+        
+        // Initialize program configuration
+        let program_config = &mut ctx.accounts.program_config;
+        program_config.max_survey_title_length = MAX_SURVEY_TITLE_LENGTH as u8;
+        program_config.max_survey_question_length = MAX_SURVEY_QUESTION_LENGTH as u16;
+        program_config.max_survey_answer_length = MAX_SURVEY_ANSWER_LENGTH as u8;
+        msg!("Program configuration initialized with max title: {}, max question: {}, max answer: {}", 
+             program_config.max_survey_title_length, 
+             program_config.max_survey_question_length, 
+             program_config.max_survey_answer_length);
         Ok(())
     }
 
@@ -102,6 +119,17 @@ pub mod solana_d_app {
         let is_member = user_account.communities.iter().any(|c| c.pda_address == community_account.key());
         require!(is_member, ErrorCode::NotMemberOfCommunity);
 
+        // Check survey title length
+        require!(title.len() <= MAX_SURVEY_TITLE_LENGTH, ErrorCode::SurveyTitleTooLong);
+
+        // Check survey question length
+        require!(questions.len() <= MAX_SURVEY_QUESTION_LENGTH, ErrorCode::SurveyQuestionTooLong);
+
+        // Check survey answers length
+        for answer in &answers {
+            require!(answer.len() <= MAX_SURVEY_ANSWER_LENGTH, ErrorCode::SurveyAnswerTooLong);
+        }
+
         require!(answers.len() <= 4, ErrorCode::TooManyAnswers);
         let now = Clock::get()?.unix_timestamp;
         require!(limitdate > now, ErrorCode::LimitDateInPast);
@@ -117,11 +145,7 @@ pub mod solana_d_app {
 
         // Add survey reference to community
         let community_account = &mut ctx.accounts.community_account;
-        let survey_ref = SurveyRef {
-            title: title.clone(),
-            pda_address: survey_account.key(),
-        };
-        community_account.surveys.push(survey_ref);
+        community_account.surveys.push(title.clone());
         msg!("Survey '{}' created for community '{}' at PDA: {}", title, community_account.name, survey_account.key());
         Ok(())
     }
@@ -155,6 +179,40 @@ pub mod solana_d_app {
         vote_record.voter = authority_key;
         Ok(())
     }
+
+    pub fn delete_survey(ctx: Context<DeleteSurvey>) -> Result<()> {
+        let community_account = &mut ctx.accounts.community_account;
+        let survey_account = &mut ctx.accounts.survey_account;
+        let authority_key = ctx.accounts.authority.key();
+
+        // Check that the authority is the community authority
+        require!(community_account.authority == authority_key, ErrorCode::NotCommunityAuthority);
+
+        // Check survey is linked to the community
+        require!(survey_account.community_name == community_account.name, ErrorCode::SurveyNotInCommunity);
+
+        // Get survey title before mutable operations
+        let survey_title = survey_account.title.clone();
+
+        // Remove the survey title from the community's surveys list
+        let survey_index = community_account.surveys.iter().position(|s| s == &survey_title);
+        require!(survey_index.is_some(), ErrorCode::SurveyNotFoundInCommunity);
+        community_account.surveys.remove(survey_index.unwrap());
+
+        // Close the survey account and return rent to the authority
+        let survey_account_info = &mut ctx.accounts.survey_account.to_account_info();
+        let authority_info = &ctx.accounts.authority.to_account_info();
+        let dest_starting_lamports = authority_info.lamports();
+        **authority_info.lamports.borrow_mut() = dest_starting_lamports
+            .checked_add(survey_account_info.lamports())
+            .unwrap();
+        **survey_account_info.lamports.borrow_mut() = 0;
+        survey_account_info.assign(&system_program::ID);
+        survey_account_info.realloc(0, false)?;
+
+        msg!("Survey '{}' deleted from community '{}' and account closed", survey_title, community_account.name);
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -162,11 +220,19 @@ pub struct Initialize<'info> {
     #[account(
         init,
         payer = authority,
-        space = 8 + 32 + (4 + 3) + 4 + (MAX_SURVEYS_PER_COMMUNITY * (4 + 50)), // discriminator + authority + name("all") + surveys vec + max surveys
+        space = 8 + 32 + (4 + 3) + 4 + (MAX_SURVEYS_PER_COMMUNITY * (4 + MAX_SURVEY_TITLE_LENGTH)), // discriminator + authority + name("all") + surveys vec + max survey titles (30 chars each)
         seeds = [b"community", b"all".as_ref()],
         bump
     )]
     pub community_account: Account<'info, CommunityAccount>,
+    #[account(
+        init,
+        payer = authority,
+        space = 8 + 1 + 2 + 1, // discriminator + max_survey_title_length (u8) + max_survey_question_length (u16) + max_survey_answer_length (u8)
+        seeds = [b"program_config"],
+        bump
+    )]
+    pub program_config: Account<'info, ProgramConfig>,
     #[account(mut)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -195,7 +261,7 @@ pub struct CreateCommunity<'info> {
     #[account(
         init,
         payer = authority,
-        space = 8 + (4 + name.len()) + 32 + 4 + (MAX_SURVEYS_PER_COMMUNITY * (4 + 50)), // discriminator + name + authority + surveys vec + max surveys
+        space = 8 + (4 + name.len()) + 32 + 4 + (MAX_SURVEYS_PER_COMMUNITY * (4 + MAX_SURVEY_TITLE_LENGTH)), // discriminator + name + authority + surveys vec + max survey titles (30 chars each)
         seeds = [b"community", name.as_bytes()],
         bump
     )]
@@ -247,13 +313,7 @@ pub struct CommunityRef {
 pub struct CommunityAccount {
     pub name: String,
     pub authority: Pubkey,
-    pub surveys: Vec<SurveyRef>,
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
-pub struct SurveyRef {
-    pub title: String,
-    pub pda_address: Pubkey,
+    pub surveys: Vec<String>, // Just store survey titles as strings
 }
 
 #[account]
@@ -276,6 +336,13 @@ pub struct VoteRecord {
     pub voter: Pubkey,
 }
 
+#[account]
+pub struct ProgramConfig {
+    pub max_survey_title_length: u8,
+    pub max_survey_question_length: u16,
+    pub max_survey_answer_length: u8,
+}
+
 #[error_code]
 pub enum ErrorCode {
     #[msg("User is already a member of this community.")]
@@ -294,6 +361,16 @@ pub enum ErrorCode {
     VotingClosed,
     #[msg("Invalid answer index.")]
     InvalidAnswerIndex,
+    #[msg("Survey title is too long.")]
+    SurveyTitleTooLong,
+    #[msg("Survey question is too long.")]
+    SurveyQuestionTooLong,
+    #[msg("Survey answer is too long.")]
+    SurveyAnswerTooLong,
+    #[msg("Authority is not the community authority.")]
+    NotCommunityAuthority,
+    #[msg("Survey not found in community.")]
+    SurveyNotFoundInCommunity,
 }
 
 #[derive(Accounts)]
@@ -308,7 +385,7 @@ pub struct CreateSurvey<'info> {
     #[account(
         init,
         payer = authority,
-        space = 8 + (4 + 50) + (4 + 50) + (4 + 200) + 4 + (4 * (4 + 50 + 4)) + 8, // discriminator + title + community_name + questions + answers vec (max 4 answers) + limitdate
+        space = 8 + (4 + MAX_SURVEY_TITLE_LENGTH) + (4 + 50) + (4 + MAX_SURVEY_QUESTION_LENGTH) + 4 + (4 * (4 + MAX_SURVEY_ANSWER_LENGTH + 4)) + 8, // discriminator + title (30 chars) + community_name + questions (200 chars) + answers vec (max 4 answers, 50 chars each) + limitdate
         seeds = [b"survey", community_account.name.as_bytes(), title.as_bytes()],
         bump
     )]
@@ -342,5 +419,19 @@ pub struct Vote<'info> {
         bump
     )]
     pub vote_record: Account<'info, VoteRecord>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct DeleteSurvey<'info> {
+    #[account(mut)]
+    pub community_account: Account<'info, CommunityAccount>,
+    #[account(
+        mut,
+        constraint = survey_account.community_name == community_account.name
+    )]
+    pub survey_account: Account<'info, SurveyAccount>,
+    #[account(signer)]
+    pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
 }

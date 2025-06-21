@@ -90,10 +90,13 @@ describe("survey creation", () => {
         communityAccount: communityPda,
         surveyAccount: surveyPda,
         authority: user.publicKey,
+        userAccount: userPda,
         systemProgram: anchor.web3.SystemProgram.programId,
       })
       .instruction();
     await sendIx(ix, user.publicKey, [user]);
+
+    console.log(`✅ Survey "${surveyTitle}" successfully created for community: "${uniqueCommunityName}"`);
 
     // Fetch and check the survey account
     const survey = await program.account.surveyAccount.fetch(surveyPda);
@@ -108,9 +111,9 @@ describe("survey creation", () => {
     // Fetch and check the community account's surveys vector
     const community = await program.account.communityAccount.fetch(communityPda);
     assert.isAtLeast(community.surveys.length, 1);
-    const found = community.surveys.find((s: any) => s.title === surveyTitle);
-    assert.isOk(found);
-    assert.equal(found.pdaAddress.toBase58(), surveyPda.toBase58());
+    const found = community.surveys.find((s: string) => s === surveyTitle);
+    assert.isOk(found, `Survey title "${surveyTitle}" should be in the community's surveys list`);
+    console.log(`✅ Survey title "${surveyTitle}" found in community's surveys list`);
   });
 
   it("blocks a non-member from creating a survey for a community", async () => {
@@ -193,8 +196,91 @@ describe("survey creation", () => {
       await sendIx(surveyIx, user2.publicKey, [user2]);
       assert.fail("Non-member should not be able to create a survey");
     } catch (e) {
+      console.log(`❌ Survey creation blocked for community: "${uniqueCommunityName}"`);
       console.log('Expected error message:', e.message);
       assert.include(e.message, "not a member");
     }
+  });
+
+  it("blocks survey creation with title longer than 30 characters", async () => {
+    // Create a survey title that's exactly 31 characters long
+    const longSurveyTitle = "This survey title is exactly 31";
+    const surveyQuestions = "What do you think about this long title?";
+    const surveyAnswers = ["Too long", "Just right", "Too short"];
+    
+    // Verify the title is exactly 31 characters
+    assert.equal(longSurveyTitle.length, 31, "Title should be exactly 31 characters");
+    
+    // Derive PDA for the long title survey
+    const [longSurveyPda] = await anchor.web3.PublicKey.findProgramAddress(
+      [Buffer.from("survey"), Buffer.from(uniqueCommunityName), Buffer.from(longSurveyTitle)],
+      programId
+    );
+    
+    const now = Math.floor(Date.now() / 1000);
+    const limitdate = now + 3600;
+    
+    try {
+      const surveyIx = await program.methods
+        .createSurvey(longSurveyTitle, surveyQuestions, surveyAnswers, new anchor.BN(limitdate))
+        .accounts({
+          communityAccount: communityPda,
+          surveyAccount: longSurveyPda,
+          authority: user.publicKey,
+          userAccount: userPda,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .instruction();
+      await sendIx(surveyIx, user.publicKey, [user]);
+      assert.fail("Survey with long title should not be created");
+    } catch (e) {
+      console.log(`❌ Survey creation blocked for long title: "${longSurveyTitle}"`);
+      console.log('Error message:', e.message);
+      assert.include(e.message, "Survey title is too long");
+    }
+  });
+
+  it("allows survey creation with title exactly 30 characters", async () => {
+    // Create a survey title that's exactly 30 characters long
+    const exactSurveyTitle = "This title is exactly 30 chars";
+    const surveyQuestions = "Is this title the right length?";
+    const surveyAnswers = ["Yes", "No", "Maybe"];
+    
+    // Verify the title is exactly 30 characters
+    assert.equal(exactSurveyTitle.length, 30, "Title should be exactly 30 characters");
+    
+    // Derive PDA for the exact length survey
+    const [exactSurveyPda] = await anchor.web3.PublicKey.findProgramAddress(
+      [Buffer.from("survey"), Buffer.from(uniqueCommunityName), Buffer.from(exactSurveyTitle)],
+      programId
+    );
+    
+    const now = Math.floor(Date.now() / 1000);
+    const limitdate = now + 3600;
+    
+    const surveyIx = await program.methods
+      .createSurvey(exactSurveyTitle, surveyQuestions, surveyAnswers, new anchor.BN(limitdate))
+      .accounts({
+        communityAccount: communityPda,
+        surveyAccount: exactSurveyPda,
+        authority: user.publicKey,
+        userAccount: userPda,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .instruction();
+    await sendIx(surveyIx, user.publicKey, [user]);
+
+    console.log(`✅ Survey with exact 30-character title created: "${exactSurveyTitle}"`);
+
+    // Verify the survey was created successfully
+    const survey = await program.account.surveyAccount.fetch(exactSurveyPda);
+    assert.equal(survey.title, exactSurveyTitle);
+    assert.equal(survey.communityName, uniqueCommunityName);
+    
+    // Verify it's in the community's surveys list
+    const community = await program.account.communityAccount.fetch(communityPda);
+    const found = community.surveys.find((s: string) => s === exactSurveyTitle);
+    assert.isOk(found, `Survey title "${exactSurveyTitle}" should be in the community's surveys list`);
+    console.log(`✅ Survey title "${exactSurveyTitle}" found in community's surveys list`);
   });
 }); 
