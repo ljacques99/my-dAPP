@@ -5,7 +5,7 @@ import Home from './Home.jsx'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { Connection } from '@solana/web3.js'
 
-const solanaConnection = new Connection('http://127.0.0.1:53734');
+const solanaConnection = new Connection('http://127.0.0.1:8899');
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

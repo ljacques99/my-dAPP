@@ -114,25 +114,35 @@ function Home({ connection }) {
     setRegisterLoading(true);
     try {
       const provider = new anchor.AnchorProvider(connection, window.solana, anchor.AnchorProvider.defaultOptions());
-      console.log('Imported IDL:', idl);
       const program = new anchor.Program(idl, provider);
-      console.log('Program object:', program);
+      
       const publicKey = new PublicKey(walletAddress);
       const [userPda] = await PublicKey.findProgramAddress([
         Buffer.from(USER_SEED),
         publicKey.toBuffer(),
       ], new PublicKey(PROGRAM_ID));
-      // Try to fetch the user account
-      try {
-        const userAccount = await program.account.userAccount.fetch(userPda);
-        console.log('Fetched user account:', userAccount);
-        setError('Fetched user account: ' + JSON.stringify(userAccount));
-      } catch (fetchErr) {
-        console.error('Error fetching user account:', fetchErr);
-        setError('Error fetching user account: ' + (fetchErr && fetchErr.message ? fetchErr.message : JSON.stringify(fetchErr)));
-      }
+
+      console.log('Registering user with PDA:', userPda.toString());
+      
+      // Call the register_user instruction
+      const tx = await program.methods
+        .registerUser()
+        .accounts({
+          userAccount: userPda,
+          authority: publicKey,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .rpc();
+
+      console.log('Registration transaction signature:', tx);
+      setError('User registered successfully! Transaction: ' + tx);
+      
+      // Update registration status
+      setIsRegistered(true);
+      
     } catch (err) {
-      setError('Register failed: ' + (err && err.message ? err.message : JSON.stringify(err)));
+      console.error('Registration error:', err);
+      setError('Registration failed: ' + (err && err.message ? err.message : JSON.stringify(err)));
     }
     setRegisterLoading(false);
   };
