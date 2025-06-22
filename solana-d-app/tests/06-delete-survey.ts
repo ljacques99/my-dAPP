@@ -9,7 +9,7 @@ describe("delete-survey", () => {
   anchor.setProvider(provider);
 
   const program = anchor.workspace.SolanaDApp as Program<SolanaDApp>;
-  const programId = new anchor.web3.PublicKey("HSh6ntCpps9Zfa9rsZjqYzEXpK3uXqEXY7iLegF9angR");
+  const programId = new anchor.web3.PublicKey("Ho1P3APYbSz3DUZyjNiezxuVkGinLB9vkqAfLBfVM8Cm");
 
   async function sendIx(ix: anchor.web3.TransactionInstruction, feePayer: anchor.web3.PublicKey, signers: anchor.web3.Keypair[]) {
     const tx = new anchor.web3.Transaction().add(ix);

@@ -1,0 +1,11 @@
+To build the contrat from solana-d-app directory
+
+anchor build
+
+If you have trouble running test woth an error about mocha, you might need to run (from solana-d-app directory)
+
+yarn add --dev @types/mocha @types/chai
+
+
+You need to copy solana_d_app.json after building. run from main directory
+cp solana-d-app/target/idl/solana_d_app.json front/src/

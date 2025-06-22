@@ -6,7 +6,7 @@ import { assert } from "chai";
 describe("vote instruction", () => {
   anchor.setProvider(anchor.AnchorProvider.env());
   const program = anchor.workspace.solanaDApp as Program<SolanaDApp>;
-  const programId = new anchor.web3.PublicKey("HSh6ntCpps9Zfa9rsZjqYzEXpK3uXqEXY7iLegF9angR");
+  const programId = new anchor.web3.PublicKey("Ho1P3APYbSz3DUZyjNiezxuVkGinLB9vkqAfLBfVM8Cm");
 
   const surveyTitle = "Favorite Color?";
   const surveyQuestions = "What is your favorite color?";

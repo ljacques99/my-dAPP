@@ -7,7 +7,7 @@ import idl from "../target/idl/solana_d_app.json";
 describe("solana-d-app user", () => {
   anchor.setProvider(anchor.AnchorProvider.env());
   const program = anchor.workspace.solanaDApp as Program<SolanaDApp>;
-  const programId = new anchor.web3.PublicKey("HSh6ntCpps9Zfa9rsZjqYzEXpK3uXqEXY7iLegF9angR");
+  const programId = new anchor.web3.PublicKey("Ho1P3APYbSz3DUZyjNiezxuVkGinLB9vkqAfLBfVM8Cm");
 
   it("Registers a user and creates a PDA with the 'all' community", async () => {
     const user = anchor.web3.Keypair.generate();
@@ -51,10 +51,8 @@ describe("solana-d-app user", () => {
     assert.strictEqual(userAccount.authority.toBase58(), user.publicKey.toBase58());
     assert.isArray(userAccount.communities);
     assert.lengthOf(userAccount.communities, 1);
-    // Check the "all" community reference details
-    const allCommunityRef = userAccount.communities[0];
-    assert.strictEqual(allCommunityRef.name, "all");
-    assert.strictEqual(allCommunityRef.pdaAddress.toBase58(), communityPda.toBase58());
-    console.log("User is registered with 'all' community reference:", allCommunityRef);
+    // Check the "all" community name
+    assert.strictEqual(userAccount.communities[0], "all");
+    console.log("User is registered with 'all' community:", userAccount.communities[0]);
   });
 }); 

@@ -7,7 +7,7 @@ import idl from "../target/idl/solana_d_app.json";
 describe("solana-d-app init", () => {
   anchor.setProvider(anchor.AnchorProvider.env());
   const program = anchor.workspace.solanaDApp as Program<SolanaDApp>;
-  const programId = new anchor.web3.PublicKey("HSh6ntCpps9Zfa9rsZjqYzEXpK3uXqEXY7iLegF9angR");
+  const programId = new anchor.web3.PublicKey("Ho1P3APYbSz3DUZyjNiezxuVkGinLB9vkqAfLBfVM8Cm");
 
   it("Initializes the 'all' community if it doesn't exist", async () => {
     const authority = (program.provider as anchor.AnchorProvider).wallet;

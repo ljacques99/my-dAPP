@@ -1,0 +1,785 @@
+{
+  "address": "Ho1P3APYbSz3DUZyjNiezxuVkGinLB9vkqAfLBfVM8Cm",
+  "metadata": {
+    "name": "solana_d_app",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "create_community",
+      "discriminator": [
+        203,
+        214,
+        176,
+        194,
+        13,
+        207,
+        22,
+        60
+      ],
+      "accounts": [
+        {
+          "name": "community_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  109,
+                  109,
+                  117,
+                  110,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "name"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "user_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "name",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "create_survey",
+      "discriminator": [
+        25,
+        36,
+        97,
+        69,
+        88,
+        88,
+        54,
+        222
+      ],
+      "accounts": [
+        {
+          "name": "community_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  109,
+                  109,
+                  117,
+                  110,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "community_account.name",
+                "account": "CommunityAccount"
+              }
+            ]
+          }
+        },
+        {
+          "name": "survey_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  114,
+                  118,
+                  101,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "community_account.name",
+                "account": "CommunityAccount"
+              },
+              {
+                "kind": "arg",
+                "path": "title"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "user_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "title",
+          "type": "string"
+        },
+        {
+          "name": "questions",
+          "type": "string"
+        },
+        {
+          "name": "answers",
+          "type": {
+            "vec": "string"
+          }
+        },
+        {
+          "name": "limitdate",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "delete_survey",
+      "discriminator": [
+        145,
+        157,
+        194,
+        49,
+        18,
+        29,
+        148,
+        236
+      ],
+      "accounts": [
+        {
+          "name": "community_account",
+          "writable": true
+        },
+        {
+          "name": "survey_account",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "exit_community",
+      "discriminator": [
+        205,
+        87,
+        2,
+        104,
+        117,
+        31,
+        113,
+        135
+      ],
+      "accounts": [
+        {
+          "name": "user_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "community_account"
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize",
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "community_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  109,
+                  109,
+                  117,
+                  110,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  108,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  103,
+                  114,
+                  97,
+                  109,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "join_community",
+      "discriminator": [
+        252,
+        106,
+        147,
+        30,
+        134,
+        74,
+        28,
+        232
+      ],
+      "accounts": [
+        {
+          "name": "user_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "community_account"
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "register_user",
+      "discriminator": [
+        2,
+        241,
+        150,
+        223,
+        99,
+        214,
+        116,
+        97
+      ],
+      "accounts": [
+        {
+          "name": "user_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "vote",
+      "discriminator": [
+        227,
+        110,
+        155,
+        23,
+        136,
+        126,
+        172,
+        25
+      ],
+      "accounts": [
+        {
+          "name": "user_account",
+          "writable": true
+        },
+        {
+          "name": "survey_account",
+          "writable": true
+        },
+        {
+          "name": "community_account"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "vote_record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  111,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "survey_account"
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "answer_index",
+          "type": "u8"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "CommunityAccount",
+      "discriminator": [
+        111,
+        62,
+        119,
+        115,
+        144,
+        161,
+        149,
+        151
+      ]
+    },
+    {
+      "name": "ProgramConfig",
+      "discriminator": [
+        196,
+        210,
+        90,
+        231,
+        144,
+        149,
+        140,
+        63
+      ]
+    },
+    {
+      "name": "SurveyAccount",
+      "discriminator": [
+        192,
+        125,
+        54,
+        163,
+        114,
+        53,
+        139,
+        224
+      ]
+    },
+    {
+      "name": "UserAccount",
+      "discriminator": [
+        211,
+        33,
+        136,
+        16,
+        186,
+        110,
+        242,
+        127
+      ]
+    },
+    {
+      "name": "VoteRecord",
+      "discriminator": [
+        112,
+        9,
+        123,
+        165,
+        234,
+        9,
+        157,
+        167
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "AlreadyMember",
+      "msg": "User is already a member of this community."
+    },
+    {
+      "code": 6001,
+      "name": "TooManyCommunities",
+      "msg": "User has reached the maximum number of communities."
+    },
+    {
+      "code": 6002,
+      "name": "TooManyAnswers",
+      "msg": "Too many answers provided (max 4)."
+    },
+    {
+      "code": 6003,
+      "name": "LimitDateInPast",
+      "msg": "Limit date must be in the future."
+    },
+    {
+      "code": 6004,
+      "name": "NotMemberOfCommunity",
+      "msg": "User is not a member of the community."
+    },
+    {
+      "code": 6005,
+      "name": "SurveyNotInCommunity",
+      "msg": "Survey is not linked to the community."
+    },
+    {
+      "code": 6006,
+      "name": "VotingClosed",
+      "msg": "Voting is closed for this survey."
+    },
+    {
+      "code": 6007,
+      "name": "InvalidAnswerIndex",
+      "msg": "Invalid answer index."
+    },
+    {
+      "code": 6008,
+      "name": "SurveyTitleTooLong",
+      "msg": "Survey title is too long."
+    },
+    {
+      "code": 6009,
+      "name": "SurveyQuestionTooLong",
+      "msg": "Survey question is too long."
+    },
+    {
+      "code": 6010,
+      "name": "SurveyAnswerTooLong",
+      "msg": "Survey answer is too long."
+    },
+    {
+      "code": 6011,
+      "name": "NotCommunityAuthority",
+      "msg": "Authority is not the community authority."
+    },
+    {
+      "code": 6012,
+      "name": "SurveyNotFoundInCommunity",
+      "msg": "Survey not found in community."
+    },
+    {
+      "code": 6013,
+      "name": "CommunityAuthorityCannotExit",
+      "msg": "Community authority cannot exit their own community."
+    }
+  ],
+  "types": [
+    {
+      "name": "Answer",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "text",
+            "type": "string"
+          },
+          {
+            "name": "votes",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CommunityAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "surveys",
+            "type": {
+              "vec": "string"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProgramConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "max_survey_title_length",
+            "type": "u8"
+          },
+          {
+            "name": "max_survey_question_length",
+            "type": "u16"
+          },
+          {
+            "name": "max_survey_answer_length",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SurveyAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "title",
+            "type": "string"
+          },
+          {
+            "name": "community_name",
+            "type": "string"
+          },
+          {
+            "name": "questions",
+            "type": "string"
+          },
+          {
+            "name": "answers",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "Answer"
+                }
+              }
+            }
+          },
+          {
+            "name": "limitdate",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UserAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "communities",
+            "type": {
+              "vec": "string"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "VoteRecord",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "voter",
+            "type": "pubkey"
+          }
+        ]
+      }
+    }
+  ]
+}
