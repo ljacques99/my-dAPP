@@ -3,6 +3,7 @@ import { Program } from "@coral-xyz/anchor";
 import { SolanaDApp } from "../target/types/solana_d_app";
 import { assert } from "chai";
 import idl from "../target/idl/solana_d_app.json";
+import bs58 from "bs58";
 
 describe("solana-d-app init", () => {
   anchor.setProvider(anchor.AnchorProvider.env());
@@ -44,4 +45,53 @@ describe("solana-d-app init", () => {
     assert.isArray(communityAccount.surveys);
     assert.lengthOf(communityAccount.surveys, 0);
   });
+
+  it("Lists all PDAs of the program using getProgramAccounts", async () => {
+    const connection = program.provider.connection;
+    const accountTypes = [
+      { name: "CommunityAccount", discriminator: Buffer.from([111, 62, 119, 115, 144, 161, 149, 151]) },
+      { name: "ProgramConfig", discriminator: Buffer.from([196, 210, 90, 231, 144, 149, 140, 63]) },
+      { name: "SurveyAccount", discriminator: Buffer.from([192, 125, 54, 163, 114, 53, 139, 224]) },
+      { name: "UserAccount", discriminator: Buffer.from([211, 33, 136, 16, 186, 110, 242, 127]) },
+      { name: "VoteRecord", discriminator: Buffer.from([112, 9, 123, 165, 234, 9, 157, 167]) },
+    ];
+    for (const { name, discriminator } of accountTypes) {
+      const accounts = await connection.getProgramAccounts(programId);
+      console.log(`\n=== ${name} PDAs ===`);
+      accounts.forEach((acc, i) => {
+        console.log(`${i + 1}. ${acc.pubkey.toBase58()} ${name})`);
+      });
+      if (accounts.length === 0) {
+        console.log("(none found)");
+      }
+    }
+  });
+
+  it("Lists all UserAccount PDAs of the program using getProgramAccounts", async () => {
+    const connection = program.provider.connection;
+    const accountTypes = [
+      "UserAccount"
+    ];
+  
+    for (const name of accountTypes) {
+      const idlAccount = idl.accounts.find((acc) => acc.name === name);
+      if (!idlAccount) {
+        console.warn(`No discriminator found for ${name}`);
+        continue;
+      }
+  
+      const discriminator = Buffer.from(idlAccount.discriminator);
+      const encodedDisc = bs58.encode(discriminator);
+  
+      const accounts = await connection.getProgramAccounts(program.programId, {
+        filters: [{ memcmp: { offset: 0, bytes: encodedDisc } }],
+      });
+    console.log(`\n=== UserAccount PDAs ===`);
+    accounts.forEach((acc, i) => {
+      console.log(`${i + 1}. ${acc.pubkey.toBase58()} (UserAccount) ${Buffer.from(acc.account.data)}`);
+    });
+    if (accounts.length === 0) {
+      console.log("(none found)");
+    }
+  }});
 }); 

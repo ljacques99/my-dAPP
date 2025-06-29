@@ -6,13 +6,11 @@ import idl from './solana_d_app.json'
 const USER_SEED = "user";
 const PROGRAM_ID = "Ho1P3APYbSz3DUZyjNiezxuVkGinLB9vkqAfLBfVM8Cm";
 
-function Home({ connection }) {
-  const [walletAddress, setWalletAddress] = useState(null);
+function Home({ connection, walletAddress, isRegistered, checkingRegistration, onWalletConnect, onNavigate }) {
   const [error, setError] = useState(null);
   const [slot, setSlot] = useState(null);
   const [balance, setBalance] = useState(null);
   const [airdropLoading, setAirdropLoading] = useState(false);
-  const [isRegistered, setIsRegistered] = useState(null);
   const [registerLoading, setRegisterLoading] = useState(false);
 
   // Use the provided connection to get the slot
@@ -34,53 +32,6 @@ function Home({ connection }) {
       setBalance(null);
     }
   }, [connection, walletAddress]);
-
-  // Check if user is registered
-  useEffect(() => {
-    const checkRegistration = async () => {
-      setIsRegistered(null);
-      if (connection && walletAddress) {
-        try {
-          const [userPda] = await PublicKey.findProgramAddress(
-            [Buffer.from(USER_SEED), new PublicKey(walletAddress).toBuffer()],
-            new PublicKey(PROGRAM_ID)
-          );
-          const acc = await connection.getAccountInfo(userPda);
-          setIsRegistered(!!acc);
-        } catch (e) {
-          setIsRegistered(false);
-        }
-      }
-    };
-    checkRegistration();
-  }, [connection, walletAddress]);
-
-  useEffect(() => {
-    if (window?.solana?.isPhantom) {
-      const handleDisconnect = () => {
-        setWalletAddress(null);
-        setError('Wallet disconnected.');
-      };
-      window.solana.on('disconnect', handleDisconnect);
-      return () => {
-        window.solana.off('disconnect', handleDisconnect);
-      };
-    }
-  }, []);
-
-  const handleConnectWallet = async () => {
-    setError(null);
-    if (window?.solana?.isPhantom) {
-      try {
-        const resp = await window.solana.connect();
-        setWalletAddress(resp.publicKey.toString());
-      } catch (err) {
-        setError('Connection to Phantom was rejected.');
-      }
-    } else {
-      setError('Phantom wallet not found. Please install the Phantom extension.');
-    }
-  };
 
   const handleAirdrop = async () => {
     setError(null);
@@ -137,14 +88,22 @@ function Home({ connection }) {
       console.log('Registration transaction signature:', tx);
       setError('User registered successfully! Transaction: ' + tx);
       
-      // Update registration status
-      setIsRegistered(true);
+      // Navigate to communities page after successful registration
+      setTimeout(() => {
+        onNavigate('communities');
+      }, 2000);
       
     } catch (err) {
       console.error('Registration error:', err);
       setError('Registration failed: ' + (err && err.message ? err.message : JSON.stringify(err)));
     }
     setRegisterLoading(false);
+  };
+
+  const handleDisconnect = async () => {
+    if (window?.solana?.isPhantom) {
+      await window.solana.disconnect();
+    }
   };
 
   return (
@@ -160,12 +119,16 @@ function Home({ connection }) {
           {walletAddress ? (
             <div style={{ marginTop: '20px', fontSize: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
               <div>Connected: {walletAddress}</div>
-              {isRegistered !== null && (
+              {checkingRegistration ? (
+                <div style={{ marginTop: '5px', fontSize: '15px', color: 'orange' }}>
+                  Checking registration status...
+                </div>
+              ) : isRegistered !== null && (
                 <div style={{ marginTop: '5px', fontSize: '15px', color: isRegistered ? '#4caf50' : 'red' }}>
                   {isRegistered ? 'User is registered ✅' : 'User is NOT registered ❌'}
                 </div>
               )}
-              {!isRegistered && isRegistered !== null && (
+              {!isRegistered && isRegistered !== null && !checkingRegistration && (
                 <button
                   onClick={handleRegisterUser}
                   disabled={registerLoading}
@@ -174,18 +137,21 @@ function Home({ connection }) {
                   {registerLoading ? 'Registering...' : 'Register User'}
                 </button>
               )}
+              {isRegistered && (
+                <button
+                  onClick={() => onNavigate('communities')}
+                  style={{ marginTop: '10px', padding: '8px 16px', fontSize: '14px', cursor: 'pointer', background: '#2196f3', color: 'white', border: 'none', borderRadius: '4px' }}
+                >
+                  View My Communities
+                </button>
+              )}
               {balance !== null && (
                 <div style={{ marginTop: '5px', fontSize: '15px', color: '#4caf50' }}>
                   Balance: {balance} SOL
                 </div>
               )}
               <button
-                onClick={async () => {
-                  if (window?.solana?.isPhantom) {
-                    await window.solana.disconnect();
-                    setWalletAddress(null);
-                  }
-                }}
+                onClick={handleDisconnect}
                 style={{ marginTop: '10px', padding: '8px 16px', fontSize: '14px', cursor: 'pointer' }}
               >
                 Disconnect
@@ -199,14 +165,14 @@ function Home({ connection }) {
               </button>
             </div>
           ) : (
-            <button onClick={handleConnectWallet} style={{ marginTop: '20px', padding: '10px 20px', fontSize: '16px', cursor: 'pointer' }}>
+            <button onClick={onWalletConnect} style={{ marginTop: '20px', padding: '10px 20px', fontSize: '16px', cursor: 'pointer' }}>
               Connect Phantom Wallet
             </button>
           )}
           {error && (
             <div
               style={{
-                color: error.startsWith('Airdrop succeeded!') ? '#4caf50' : 'red',
+                color: error.startsWith('Airdrop succeeded!') || error.includes('registered successfully') ? '#4caf50' : 'red',
                 marginTop: '10px',
               }}
             >
